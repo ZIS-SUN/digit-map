@@ -1,0 +1,32 @@
+# Maven
+specimen-backend/target/
+specimen-backend/*.log
+specimen-backend/*.jar
+specimen-backend/.mvn/
+specimen-backend/mvnw
+specimen-backend/mvnw.cmd
+
+# Node
+specimen-frontend/node_modules/
+specimen-frontend/dist/
+specimen-frontend/.vite/
+specimen-frontend/.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Temp files
+*.tmp
+*.temp
+

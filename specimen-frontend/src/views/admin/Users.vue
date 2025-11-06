@@ -1,0 +1,252 @@
+<template>
+  <div class="users-admin-container">
+    <el-container>
+      <el-aside width="200px">
+        <div class="logo">管理后台</div>
+        <el-menu 
+          :default-active="$route.path" 
+          router
+          background-color="#304156"
+          text-color="#fff"
+          active-text-color="#409EFF"
+        >
+          <el-menu-item index="/admin/dashboard">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>数据仪表盘</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/specimens">
+            <el-icon><Tickets /></el-icon>
+            <span>标本管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/map">
+            <el-icon><Location /></el-icon>
+            <span>地图标注</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/users">
+            <el-icon><User /></el-icon>
+            <span>用户管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/announcements">
+            <el-icon><Bell /></el-icon>
+            <span>公告管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/collections">
+            <el-icon><Document /></el-icon>
+            <span>采集记录</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/export">
+            <el-icon><Download /></el-icon>
+            <span>数据导出</span>
+          </el-menu-item>
+        </el-menu>
+      </el-aside>
+
+      <el-container>
+        <el-header class="header">
+          <span class="title">用户管理</span>
+          <el-dropdown>
+            <span class="user-info">
+              <el-icon><User /></el-icon>
+              {{ userStore.username }}
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="userStore.logout()">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </el-header>
+
+        <el-main>
+          <el-card>
+            <template #header>
+              <search-bar v-model="queryParams.keyword" placeholder="搜索用户名或邮箱" @search="handleSearch" style="width: 300px;" />
+            </template>
+
+            <el-table :data="users" v-loading="loading" stripe>
+              <el-table-column prop="id" label="ID" width="80" />
+              <el-table-column prop="username" label="用户名" />
+              <el-table-column prop="email" label="邮箱" />
+              <el-table-column prop="phone" label="手机号" />
+              <el-table-column label="状态" width="100">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
+                    {{ row.status === 'active' ? '正常' : '禁用' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="createTime" label="注册时间" width="180">
+                <template #default="{ row }">
+                  {{ formatDate(row.createTime) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="200" fixed="right">
+                <template #default="{ row }">
+                  <el-button 
+                    :type="row.status === 'active' ? 'warning' : 'success'" 
+                    link 
+                    @click="toggleStatus(row)"
+                  >
+                    {{ row.status === 'active' ? '禁用' : '启用' }}
+                  </el-button>
+                  <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <el-pagination
+              v-if="total > 0"
+              v-model:current-page="queryParams.page"
+              v-model:page-size="queryParams.pageSize"
+              :total="total"
+              layout="total, prev, pager, next"
+              @current-change="fetchData"
+              class="pagination"
+            />
+          </el-card>
+        </el-main>
+      </el-container>
+    </el-container>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { useUserStore } from '@/store/user'
+import { getUsers, updateUserStatus, deleteUser } from '@/api/user'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import SearchBar from '@/components/SearchBar.vue'
+import { DataAnalysis, Tickets, Location, User, Bell, Document, Download } from '@element-plus/icons-vue'
+
+const userStore = useUserStore()
+
+const users = ref([])
+const total = ref(0)
+const loading = ref(false)
+
+const queryParams = reactive({
+  page: 1,
+  pageSize: 10,
+  keyword: ''
+})
+
+onMounted(() => {
+  fetchData()
+})
+
+const fetchData = async () => {
+  loading.value = true
+  try {
+    const res = await getUsers(queryParams)
+    if (res.code === 200) {
+      users.value = res.data.list
+      total.value = res.data.total
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleSearch = () => {
+  queryParams.page = 1
+  fetchData()
+}
+
+const toggleStatus = async (row) => {
+  const newStatus = row.status === 'active' ? 'disabled' : 'active'
+  const action = newStatus === 'active' ? '启用' : '禁用'
+  
+  try {
+    await ElMessageBox.confirm(`确定要${action}该用户吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    const res = await updateUserStatus(row.id, newStatus)
+    if (res.code === 200) {
+      ElMessage.success(`${action}成功`)
+      fetchData()
+    }
+  } catch (error) {
+    // 取消操作
+  }
+}
+
+const handleDelete = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该用户吗？此操作不可恢复！', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    const res = await deleteUser(row.id)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      fetchData()
+    }
+  } catch (error) {
+    // 取消删除
+  }
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN')
+}
+</script>
+
+<style scoped lang="scss">
+.users-admin-container {
+  height: 100vh;
+}
+
+.el-aside {
+  background-color: #304156;
+  color: #fff;
+  
+  .logo {
+    height: 60px;
+    line-height: 60px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: #fff;
+    background-color: #263445;
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,21,41,.08);
+  
+  .title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #303133;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    color: #303133;
+  }
+}
+
+.el-main {
+  background: #f0f2f5;
+}
+
+.pagination {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+</style>
+
